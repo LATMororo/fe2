@@ -1,0 +1,13 @@
+# Ignore object files from different compilation schemes and their binaries.
+src/OBJ
+src/OBJ_OPT
+src/OBJ_DBG
+src/fe2
+src/fe2-opt
+src/fe2-dbg
+
+# From examples folders, ignore output (*.mech), log (*.log), and mesh (*msh) 
+# files.
+examples/**/*.mech
+examples/**/*.log
+examples/**/*.msh
