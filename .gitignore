@@ -6,8 +6,9 @@ src/fe2
 src/fe2-opt
 src/fe2-dbg
 
-# From examples folders, ignore output (*.mech), log (*.log), and mesh (*msh) 
-# files.
+# From examples folders, ignore output (*.mech), log (*.log), mesh (*msh), and 
+# sample files.
 examples/**/*.mech
 examples/**/*.log
 examples/**/*.msh
+examples/**/samp.*

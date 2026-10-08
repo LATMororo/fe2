@@ -121,13 +121,6 @@ class SolidModel : public Model
 
  private:
 
-  void                      setIPMap_             () const;
-
-  idx_t                     getIPIdx_
-
-    ( idx_t                   ielem,
-      idx_t                   ip )                   const;
-
   void                      assemble_
 
     ( MatrixBuilder&          mbld,

@@ -609,8 +609,8 @@ void SolidModel::configure
         currEnd       = currStart + currChunkSize;
 
         workers_.insert ( 
-	  it, jem::newInstance<Worker_> ( currStart, currEnd, this ) 
-	);
+	      it, jem::newInstance<Worker_> ( currStart, currEnd, this ) 
+	    );
 
         jobs_.insert ( 
           it, pool_->newJob ( workers_.getAs<Worker_>( it ) )
