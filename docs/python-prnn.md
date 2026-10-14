@@ -25,6 +25,9 @@ the solver. C++ rebuilds are needed when adding a new native material.
 
 ## Build
 
+For a container with the compiled solver, native extension and Python tools,
+use the [Apptainer recipe](apptainer.md).
+
 Use an isolated Python environment. Tested prerequisites are Python 3.12,
 CPU PyTorch 2.8.0, pybind11 3.0.1, NumPy and pandas 2.2.3. The interpreter's
 development headers and shared library are needed for embedding:

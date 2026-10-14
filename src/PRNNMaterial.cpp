@@ -37,7 +37,7 @@ void initializePython ()
 
 py::array_t<double> input ( const Vector& strain )
 {
-  py::array_t<double> result(strain.size());
+  py::array_t<double> result(static_cast<py::ssize_t>(strain.size()));
   for (idx_t i=0;i<strain.size();++i) result.mutable_data()[i]=strain[i];
   return result;
 }

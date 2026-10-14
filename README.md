@@ -17,3 +17,5 @@ TODO:
 The optional [Python PRNN bridge](docs/python-prnn.md) lets Python architectures
 use the native C++ material models for training and online Jive simulations.
 The Python network controls forward propagation; Jive controls commit/cancel.
+An [Apptainer definition](docs/apptainer.md) builds a ready-to-run CPU image,
+including the toolkits, Python bridge and pretrained example.
