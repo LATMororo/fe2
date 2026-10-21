@@ -2,4 +2,4 @@ numpy>=1.26
 pandas>=2.2
 pybind11>=3.0
 # Install the CPU wheel separately using https://download.pytorch.org/whl/cpu.
-torch>=2.8
+torch>=2.9
