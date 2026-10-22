@@ -11,6 +11,7 @@ src/fe2-dbg
 examples/**/*.mech
 examples/**/*.log
 examples/**/*.msh
+examples/**/samp.*
 
 src/OBJ_*/
 python/OBJ*/
