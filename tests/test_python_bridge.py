@@ -131,6 +131,26 @@ with ThreadPoolExecutor(max_workers=1) as pool:
         history_gradient=torch.autograd.grad(final_stress,path)[0][0,0]
         self.assertGreater(history_gradient.abs().max().item(),1.)
 
+    def test_stepwise_history_matches_replay(self):
+        # Stepwise (history variables) and replay backward passes are two
+        # approximations of the same derivative.
+        from pyprnn import material
+        path=torch.tensor([[[.02,-.002,.004],[.045,-.004,.01],[.03,-.003,.006],[.006,-.001,.002]],
+                           [[.01,.001,-.002],[.03,.004,-.012],[.035,.002,-.01],[.0,.0,.0]]],dtype=torch.float64)
+        def gradient(stepwise):
+            model=network()
+            original=material.MaterialContext.__init__
+            def init(self,*args,**kwargs):
+                original(self,*args,**kwargs)
+                self.stepwise=self.stepwise and stepwise
+            material.MaterialContext.__init__=init
+            try:
+                model(path)[:,-1].square().sum().backward()
+            finally:
+                material.MaterialContext.__init__=original
+            return model.fc1.weight.grad
+        torch.testing.assert_close(gradient(True),gradient(False),rtol=1.e-4,atol=1.e-3)
+
     def test_encoder_parameter_history_gradient(self):
         model=network()
         path=torch.tensor([[[.04,-.003,.008],[.003,-.001,.001]]],dtype=torch.float64)

@@ -35,6 +35,16 @@ struct MaterialResponse
 };
 
 
+// Gradients of one material step (strain_t, history_{t-1}) -> (stress_t, history_t).
+
+struct StepGradients
+{
+  std::vector<double>                     strain;
+  std::vector<double>                     history;
+
+};
+
+
 //==================================================================================================
 //   class PythonMaterialBatch
 //==================================================================================================
@@ -48,6 +58,10 @@ class PythonMaterialBatch
   idx_t                                   count                 () const noexcept;
   idx_t                                   components            () const noexcept;
 
+  // Number of history variables per point; negative if the material does not expose them.
+
+  idx_t                                   historyCount          () const noexcept;
+
   MaterialResponse                        update 
 
     ( const std::vector<double>&            strain );
@@ -55,7 +69,22 @@ class PythonMaterialBatch
   void                                    commit                ();
   void                                    cancel                ();
 
-  // Computes the gradient of stress of given earlier strain fields. 
+  // History variables of all points after the latest update.
+
+  std::vector<double>                     history               ();
+
+  // Vector-Jacobian product of a single step, given the history before that step.
+
+  StepGradients                           stepVjp 
+
+    ( const std::vector<double>&            history,
+      const std::vector<double>&            strain,
+      const std::vector<double>&            stressAdjoint,
+      const std::vector<double>&            historyAdjoint,
+      double                                step );
+
+  // Computes the gradient of stress of given earlier strain fields by replaying them. Fallback for
+  // materials that do not expose their history.
 
   std::vector<double>                     historyVjp 
 
@@ -75,11 +104,13 @@ class PythonMaterialBatch
 
     ( State_*                               state, 
       idx_t                                 count, 
-      idx_t                                 components );
+      idx_t                                 components,
+      idx_t                                 historyCount );
 
   State_*                                 state_;
   idx_t                                   count_;
   idx_t                                   components_;
+  idx_t                                   historyCount_;
 
 };
 
