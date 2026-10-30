@@ -14,10 +14,9 @@ young=3130.; poisson=0.37; yield="64.80 - 33.60 * exp(x / -0.003407)";
 rmTolerance=1.e-12; rmMaxIter=100;};'''
 ELASTIC = 'material={type="Isotropic"; rank=2; state="PlaneStress"; young=3130.; poisson=0.37;};'
 MELRO = '''material = {type="Melro"; rank=2; state="PlaneStrain";
-young=3760.; poisson=0.3; poissonP=0.32;
-sigmaT="64.80 - 33.60 * exp(x / -0.003407)";
-sigmaC="81.00 - 42.00 * exp(x / -0.003407)";
-rmTolerance=1.e-10; rmMaxIter=1000;};'''
+young=2230.; poisson=0.3; poissonP=0.37; rmTolerance=1.e-10; rmMaxIter=50;
+sigmaT="20.19 * (1. - exp(-288.0*x)) + 3.781";
+sigmaC="55.83 * (1. - exp(-160.8*x)) + 19.02";};'''
 
 
 def network(properties=J2):
