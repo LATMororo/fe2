@@ -12,7 +12,8 @@ Unlike [prnn3d](https://github.com/SLIMM-Lab/prnn3d), this implementation featur
 * Macro strain fields can be directly imposed on a single RVE, for instance, macro strain fields can be a function of the time step. This facilitates data generation and training
 
 TODO:
-* Parallel computing with Message Passing Interface (MPI)
+* Parallel computing with Message Passing Interface (MPI). It could be interesting for data generation.
+* Update/check apptainer.def after improvements done in backpropagation-related functionalities.
 
 The optional [Python PRNN bridge](docs/python-prnn.md) lets Python architectures
 use the native C++ material models for training and online Jive simulations.
