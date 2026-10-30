@@ -107,6 +107,22 @@ class J2Material : public IsotropicMaterial
 
     ( idx_t                   count )                      override;
 
+  // History: plastic strain (6 components) and equivalent plastic
+  // strain. Dissipation is not included since it does not affect
+  // the stress.
+
+  virtual idx_t             historyCount          () const override;
+
+  virtual void              getHistory
+
+    ( const Vector&           hist,
+      idx_t                   ip )                   const override;
+
+  virtual void              setHistory
+
+    ( const Vector&           hist,
+      idx_t                   ip )                         override;
+
   virtual idx_t             rank                  () const noexcept
                                                            override;
 

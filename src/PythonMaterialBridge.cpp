@@ -220,9 +220,11 @@ class PythonMaterialBatch::State_
   std::function<Ref<Material>()>          newJiveMaterial;
 
   Ref<Material>                           material;
+  Ref<Material>                           scratch; // for derivatives; created on first use
 
   idx_t                                   count;
   idx_t                                   components;
+  idx_t                                   historyCount;
 
   bool                                    pending = false;
 
@@ -491,13 +493,14 @@ std::shared_ptr<PythonMaterialBatch> PythonMaterialFactory::create
 
     require_ ( rank >= 1_idx && rank <= 3_idx, "Unsupported material rank!" );
 
-    value->components = FEMUtils::STRAIN_COUNTS[ rank ];
+    value->components   = FEMUtils::STRAIN_COUNTS[ rank ];
+    value->historyCount = value->material->historyCount ();
 
     return value.release ();
   });
 
   return std::shared_ptr<PythonMaterialBatch> ( 
-    new PythonMaterialBatch( state, count, state->components ) 
+    new PythonMaterialBatch( state, count, state->components, state->historyCount ) 
   );
 }
 
@@ -543,9 +546,10 @@ PythonMaterialBatch::PythonMaterialBatch
 
   ( State_*  state, 
     idx_t    count, 
-    idx_t    components )
+    idx_t    components,
+    idx_t    historyCount )
 
-  : state_( state ), count_( count ), components_( components ) 
+  : state_( state ), count_( count ), components_( components ), historyCount_( historyCount ) 
 
 {}
 
@@ -583,6 +587,20 @@ idx_t PythonMaterialBatch::components
 
 {
   return components_;
+}
+
+
+//--------------------------------------------------------------------------------------------------
+//   historyCount
+//--------------------------------------------------------------------------------------------------
+
+
+idx_t PythonMaterialBatch::historyCount 
+
+  () const noexcept 
+
+{
+  return historyCount_;
 }
 
 
@@ -723,6 +741,151 @@ std::vector<double> PythonMaterialBatch::historyVjp
         result[i] += ( plus[j] - minus[j] ) * adjoint[j] / ( 2 * h );
       }
     }
+
+    return result;
+  });
+}
+
+
+//--------------------------------------------------------------------------------------------------
+//   history
+//--------------------------------------------------------------------------------------------------
+
+
+std::vector<double> PythonMaterialBatch::history 
+
+  ()
+
+{
+  require_ ( historyCount_ >= 0_idx, "Material does not expose its history variables!" );
+
+  return executor_().call( [this] {
+    std::vector<double> result ( static_cast<size_t>( count_*historyCount_ ) );
+    Vector              hist   ( historyCount_ );
+
+    for ( idx_t p = 0; p < count_; p++ )
+    {
+      state_->material->getHistory ( hist, p );
+
+      for ( idx_t k = 0; k < historyCount_; k++ ) result[ p*historyCount_+k ] = hist[k];
+    }
+
+    return result;
+  });
+}
+
+
+//--------------------------------------------------------------------------------------------------
+//   stepVjp - Vector-Jacobian Product of a single step
+//--------------------------------------------------------------------------------------------------
+//
+// Training treats each material step as a function of the current strain and the history before
+// the step, (eps_t, alpha_{t-1}) -> (sigma_t, alpha_t). PyTorch then chains these steps through
+// time, as with any recurrent cell, so the cost of a backward pass is linear in the sequence 
+// length. Given the adjoints g_sigma and g_alpha, it returns:
+//
+//   g_eps   = ( d alpha_t / d eps_t )^T g_alpha
+//   g_alpha = ( d sigma_t / d alpha_{t-1} )^T g_sigma + ( d alpha_t / d alpha_{t-1} )^T g_alpha
+//
+// The term ( d sigma_t / d eps_t )^T g_sigma is left to the caller, which has the native tangent.
+// Derivatives are central differences of one step at one point, evaluated on a scratch material 
+// so the live material state stays intact. Points are independent, so each perturbation only 
+// touches its own point.
+
+
+StepGradients PythonMaterialBatch::stepVjp 
+
+  ( const std::vector<double>&  history,
+    const std::vector<double>&  strain, 
+    const std::vector<double>&  stressAdjoint, 
+    const std::vector<double>&  historyAdjoint, 
+    double                      step )
+{
+  const idx_t nc = components_;
+  const idx_t nh = historyCount_;
+
+  require_ ( nh >= 0_idx, "Material does not expose its history variables!" );
+
+  require_ ( 
+    history.size() == static_cast<size_t>( count_*nh ) && 
+    historyAdjoint.size() == history.size(),
+    "Wrong material history dimensions!" 
+  );
+
+  require_ ( 
+    strain.size() == static_cast<size_t>( count_*nc ) && 
+    stressAdjoint.size() == strain.size(),
+    "Wrong material strain or stress adjoint dimensions!" 
+  );
+
+  require_ ( 
+    step > 0.0 && std::isfinite( step ), "Finite-difference step must be positive and finite!" 
+  );
+
+  return executor_().call( [&] {
+    if ( state_->scratch == nullptr ) state_->scratch = state_->newJiveMaterial ();
+
+    Material&     model = *state_->scratch;
+    StepGradients result;
+
+    result.strain .assign ( strain .size(), 0.0 );
+    result.history.assign ( history.size(), 0.0 );
+
+    Matrix stiff ( nc, nc );
+    Vector eps   ( nc ), sigPlus ( nc ), sigMinus ( nc );
+    Vector alpha ( nh ), newPlus ( nh ), newMinus ( nh );
+
+    for ( idx_t p = 0; p < count_; p++ )
+    {
+      for ( idx_t i = 0; i < nc; i++ ) eps[i]   = strain [ p*nc+i ];
+      for ( idx_t k = 0; k < nh; k++ ) alpha[k] = history[ p*nh+k ];
+
+      // Perturb strain components first, then history variables.
+
+      for ( idx_t i = 0; i < nc + nh; i++ )
+      {
+        double& x     = i < nc ? eps[i] : alpha[i-nc];
+        const double x0 = x;
+        const double h  = step * std::max( 1.0, std::abs( x0 ) );
+
+        x = x0 + h;
+        model.setHistory ( alpha, p );
+        model.update     ( sigPlus, stiff, eps, p );
+        model.getHistory ( newPlus, p );
+
+        x = x0 - h;
+        model.setHistory ( alpha, p );
+        model.update     ( sigMinus, stiff, eps, p );
+        model.getHistory ( newMinus, p );
+
+        x = x0;
+
+        double g = 0.0;
+
+        for ( idx_t k = 0; k < nh; k++ ) 
+        {
+          g += ( newPlus[k] - newMinus[k] ) * historyAdjoint[ p*nh+k ];
+        }
+
+        if ( i < nc )
+        {
+          result.strain[ p*nc+i ] = g / ( 2*h );
+        }
+        else
+        {
+          for ( idx_t j = 0; j < nc; j++ ) 
+          {
+            g += ( sigPlus[j] - sigMinus[j] ) * stressAdjoint[ p*nc+j ];
+          }
+
+          result.history[ p*nh+i-nc ] = g / ( 2*h );
+        }
+      }
+    }
+
+    // Leave the scratch material without a pending trial.
+
+    model.cancel ();
 
     return result;
   });

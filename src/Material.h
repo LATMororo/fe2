@@ -68,6 +68,27 @@ class Material : public jem::NamedObject
 
     ( idx_t                   count );
 
+  // Optional access to the internal (history) variables of a point,
+  // e.g., plastic strains. Training uses it to backpropagate through
+  // time one step at a time. A negative count means the material does
+  // not expose its history; zero means it is path independent.
+
+  virtual idx_t             historyCount          () const;
+
+  // Variables after the latest update (trial or committed).
+
+  virtual void              getHistory
+
+    ( const Vector&           hist,
+      idx_t                   ip )                   const;
+
+  // Overwrites the committed variables used by the next update.
+
+  virtual void              setHistory
+
+    ( const Vector&           hist,
+      idx_t                   ip );
+
   virtual idx_t             rank                  () const noexcept = 0;
   virtual ProblemType       getProblemType        () const noexcept = 0;
 

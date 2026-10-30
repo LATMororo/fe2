@@ -98,6 +98,40 @@ static void bindMaterials
           array_( response.stiff,  { mat.count(), mat.components(), mat.components() } )
         );
     })
+    // Number of history variables per point; negative if the material does not expose them
+    .def_property_readonly ( "history_count",
+      [] ( const PythonMaterialBatch&  m ) {
+        return static_cast<int>( m.historyCount() );
+      }
+    )
+    // History variables after the latest update: [material points, history count]
+    .def ( "history",
+      [] ( PythonMaterialBatch&  mat ) {
+        return array_ ( mat.history(), { mat.count(), mat.historyCount() } );
+    })
+    // Vector-Jacobian product of one step: returns gradients w.r.t. strain and previous history
+    .def( "step_vjp",
+      [] ( PythonMaterialBatch&  mat, 
+           const Input&          history, 
+           const Input&          strain,
+           const Input&          stress_adjoint, 
+           const Input&          history_adjoint, 
+           double                step ) {
+
+        StepGradients result = mat.stepVjp ( 
+          values_( history ), 
+          values_( strain ), 
+          values_( stress_adjoint ), 
+          values_( history_adjoint ), 
+          step 
+        );
+
+        return py::make_tuple ( 
+          array_( result.strain,  { mat.count(), mat.components() } ),
+          array_( result.history, { mat.count(), mat.historyCount() } )
+        );
+    }, py::arg( "history" ), py::arg( "strain" ), py::arg( "stress_adjoint" ), 
+       py::arg( "history_adjoint" ), py::arg( "step" ) = 1.e-7 )
     // Bindings for the functions 'commit' and 'cancel': they handle internal variables
     .def( "commit", &PythonMaterialBatch::commit )
     .def( "cancel", &PythonMaterialBatch::cancel )

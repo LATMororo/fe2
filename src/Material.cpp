@@ -12,6 +12,7 @@
 
 #include <jem/base/ClassTemplate.h>
 #include <jem/base/IllegalInputException.h>
+#include <jem/base/IllegalOperationException.h>
 #include <jem/util/None.h>
 
 
@@ -128,6 +129,51 @@ void Material::allocPoints
   ( idx_t  count )
 
 {}
+
+
+//-----------------------------------------------------------------------
+//   historyCount
+//-----------------------------------------------------------------------
+
+
+idx_t Material::historyCount
+
+  () const
+
+{
+  return -1;
+}
+
+
+//-----------------------------------------------------------------------
+//   getHistory & setHistory
+//-----------------------------------------------------------------------
+
+
+void Material::getHistory
+
+  ( const Vector&  hist,
+    idx_t          ip ) const
+
+{
+  throw jem::IllegalOperationException (
+    getContext (),
+    "material does not expose its history variables"
+  );
+}
+
+
+void Material::setHistory
+
+  ( const Vector&  hist,
+    idx_t          ip )
+
+{
+  throw jem::IllegalOperationException (
+    getContext (),
+    "material does not expose its history variables"
+  );
+}
 
 
 //=======================================================================
