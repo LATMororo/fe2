@@ -13,6 +13,11 @@ J2 = '''material = {type="J2"; rank=2; state="PlaneStress";
 young=3130.; poisson=0.37; yield="64.80 - 33.60 * exp(x / -0.003407)";
 rmTolerance=1.e-12; rmMaxIter=100;};'''
 ELASTIC = 'material={type="Isotropic"; rank=2; state="PlaneStress"; young=3130.; poisson=0.37;};'
+MELRO = '''material = {type="Melro"; rank=2; state="PlaneStrain";
+young=3760.; poisson=0.3; poissonP=0.32;
+sigmaT="64.80 - 33.60 * exp(x / -0.003407)";
+sigmaC="81.00 - 42.00 * exp(x / -0.003407)";
+rmTolerance=1.e-10; rmMaxIter=1000;};'''
 
 
 def network(properties=J2):
@@ -137,8 +142,8 @@ with ThreadPoolExecutor(max_workers=1) as pool:
         from pyprnn import material
         path=torch.tensor([[[.02,-.002,.004],[.045,-.004,.01],[.03,-.003,.006],[.006,-.001,.002]],
                            [[.01,.001,-.002],[.03,.004,-.012],[.035,.002,-.01],[.0,.0,.0]]],dtype=torch.float64)
-        def gradient(stepwise):
-            model=network()
+        def gradient(properties,stepwise):
+            model=network(properties)
             original=material.MaterialContext.__init__
             def init(self,*args,**kwargs):
                 original(self,*args,**kwargs)
@@ -149,7 +154,14 @@ with ThreadPoolExecutor(max_workers=1) as pool:
             finally:
                 material.MaterialContext.__init__=original
             return model.fc1.weight.grad
-        torch.testing.assert_close(gradient(True),gradient(False),rtol=1.e-4,atol=1.e-3)
+        for properties in [J2,MELRO]:
+            with self.subTest(material=properties.split('"')[1]):
+                torch.testing.assert_close(gradient(properties,True),gradient(properties,False),
+                                           rtol=1.e-4,atol=1.e-3)
+
+    def test_history_exposed(self):
+        for properties,count in [(J2,7),(MELRO,7),(ELASTIC,-1)]:
+            self.assertEqual(_fe2_material.MaterialFactory(properties)(2).history_count,count)
 
     def test_encoder_parameter_history_gradient(self):
         model=network()
